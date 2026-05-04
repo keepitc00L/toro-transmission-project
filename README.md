@@ -37,6 +37,7 @@ Toro Transmission is a leading manufacturer of precision-engineered gear motors 
    git clone https://github.com/keepitc00L/toro-transmission-project.git
    ```
 2. Open `index.html` in your browser — no build tools needed!
+3. Direct link-https://keepitc00l.github.io/toro-transmission-project/
 
 ## 📁 Project Structure
 
