@@ -1,0 +1,8 @@
+.git
+.gitignore
+README.md
+Dockerfile
+Jenkinsfile
+k8s/
+*.md
+.dockerignore
