@@ -7,7 +7,7 @@ FROM nginx:1.27-alpine
 
 LABEL maintainer="Toro Transmission DevOps"
 LABEL description="Toro Transmission static website"
-LABEL version="1.0"
+LABEL version="2.0"
 
 # Remove default nginx content
 RUN rm -rf /usr/share/nginx/html/*

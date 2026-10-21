@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
         - name: toro-transmission
-          image: toro-transmission:latest
-          imagePullPolicy: Never          # Use local Minikube Docker images
+          image: maxspeed2020/toro-transmission:latest
+          imagePullPolicy: IfNotPresent   # Pulls updated image from Docker Hub
           ports:
             - containerPort: 80
               protocol: TCP
