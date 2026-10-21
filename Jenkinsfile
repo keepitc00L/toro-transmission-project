@@ -197,7 +197,7 @@ pipeline {
                     if (!hasKubeCred) {
                         sh """
                             echo "Testing kubectl availability and cluster access..."
-                            if ! command -v kubectl >/dev/null 2>&1; then
+                            if ! command -v kubectl>/dev/null 2>&1; then
                                 echo "❌ ERROR: kubectl command not found on this Jenkins agent."
                                 echo "Please install kubectl on the Jenkins host or agent."
                                 exit 1
@@ -243,35 +243,89 @@ pipeline {
                 echo '=========================================='
                 echo '✅ STAGE 7: Verification & Health Audit'
                 echo '=========================================='
-                sh """
-                    echo "=== Kubernetes Deployment Status ==="
-                    kubectl get deployment toro-transmission -n ${K8S_NAMESPACE}
+                script {
+                    // Use the same kubeconfig strategy as the deployment stage
+                    def hasKubeCred = false
+                    try {
+                        withCredentials([file(credentialsId: env.KUBECONFIG_CRED, variable: 'KUBECONFIG_FILE')]) {
+                            hasKubeCred = true
+                            sh """
+                                export KUBECONFIG="\${KUBECONFIG_FILE}"
 
-                    echo ""
-                    echo "=== Replica Verification (Expected: 2) ==="
-                    READY_REPLICAS=\$(kubectl get deployment toro-transmission -n ${K8S_NAMESPACE} -o jsonpath='{.status.readyReplicas}')
-                    echo "Ready Replicas: \${READY_REPLICAS:-0} / 2"
-                    if [ "\${READY_REPLICAS}" != "2" ]; then
-                        echo "⚠️ Warning: Ready replicas count is \${READY_REPLICAS}, expected 2."
-                    else
-                        echo "✅ Confirmed 2/2 replicas are active and healthy."
-                    fi
+                                echo "=== Kubernetes Deployment Status ==="
+                                kubectl get deployment toro-transmission -n ${K8S_NAMESPACE}
 
-                    echo ""
-                    echo "=== Active Pods ==="
-                    kubectl get pods -l app=toro-transmission -n ${K8S_NAMESPACE} -o wide
+                                echo ""
+                                echo "=== Replica Verification (Expected: 2) ==="
+                                READY_REPLICAS=\$(kubectl get deployment toro-transmission -n ${K8S_NAMESPACE} -o jsonpath='{.status.readyReplicas}')
+                                echo "Ready Replicas: \${READY_REPLICAS:-0} / 2"
+                                if [ "\${READY_REPLICAS}" != "2" ]; then
+                                    echo "❌ ERROR: Ready replicas count is \${READY_REPLICAS:-0}, expected 2. Failing pipeline."
+                                    kubectl get pods -l app=toro-transmission -n ${K8S_NAMESPACE} -o wide
+                                    exit 1
+                                else
+                                    echo "✅ Confirmed 2/2 replicas are active and healthy."
+                                fi
 
-                    echo ""
-                    echo "=== Service & NodePort Access ==="
-                    kubectl get svc toro-transmission-service -n ${K8S_NAMESPACE}
+                                echo ""
+                                echo "=== Active Pods ==="
+                                kubectl get pods -l app=toro-transmission -n ${K8S_NAMESPACE} -o wide
 
-                    echo ""
-                    echo "=== Access Instructions ==="
-                    echo "If running on local Minikube:"
-                    echo "  Run: minikube service toro-transmission-service --url"
-                    echo "If running on cloud/node:"
-                    echo "  Open: http://<NODE_IP>:${NODE_PORT}"
-                """
+                                echo ""
+                                echo "=== Service & NodePort Access ==="
+                                kubectl get svc toro-transmission-service -n ${K8S_NAMESPACE}
+
+                                echo ""
+                                echo "=== Access Instructions ==="
+                                echo "If running on local Minikube:"
+                                echo "  Run: minikube service toro-transmission-service --url"
+                                echo "If running on cloud/node:"
+                                echo "  Open: http://<NODE_IP>:${NODE_PORT}"
+                            """
+                        }
+                    } catch (org.jenkinsci.plugins.credentialsbinding.impl.CredentialNotFoundException e) {
+                        hasKubeCred = false
+                    } catch (Exception ex) {
+                        if (hasKubeCred) {
+                            throw ex
+                        }
+                    }
+
+                    // Fallback to agent default kubectl if credential was not configured
+                    if (!hasKubeCred) {
+                        sh """
+                            echo "=== Kubernetes Deployment Status ==="
+                            kubectl get deployment toro-transmission -n ${K8S_NAMESPACE}
+
+                            echo ""
+                            echo "=== Replica Verification (Expected: 2) ==="
+                            READY_REPLICAS=\$(kubectl get deployment toro-transmission -n ${K8S_NAMESPACE} -o jsonpath='{.status.readyReplicas}')
+                            echo "Ready Replicas: \${READY_REPLICAS:-0} / 2"
+                            if [ "\${READY_REPLICAS}" != "2" ]; then
+                                echo "❌ ERROR: Ready replicas count is \${READY_REPLICAS:-0}, expected 2. Failing pipeline."
+                                kubectl get pods -l app=toro-transmission -n ${K8S_NAMESPACE} -o wide
+                                exit 1
+                            else
+                                echo "✅ Confirmed 2/2 replicas are active and healthy."
+                            fi
+
+                            echo ""
+                            echo "=== Active Pods ==="
+                            kubectl get pods -l app=toro-transmission -n ${K8S_NAMESPACE} -o wide
+
+                            echo ""
+                            echo "=== Service & NodePort Access ==="
+                            kubectl get svc toro-transmission-service -n ${K8S_NAMESPACE}
+
+                            echo ""
+                            echo "=== Access Instructions ==="
+                            echo "If running on local Minikube:"
+                            echo "  Run: minikube service toro-transmission-service --url"
+                            echo "If running on cloud/node:"
+                            echo "  Open: http://<NODE_IP>:${NODE_PORT}"
+                        """
+                    }
+                }
             }
         }
     }
@@ -279,23 +333,23 @@ pipeline {
     post {
         success {
             echo '''
-            ╔══════════════════════════════════════════════════════════════╗
-            ║  ✅  TORO TRANSMISSION CI/CD PIPELINE SUCCEEDED             ║
+            ╔═══════════════════════════════════════════════════════════════╗
+            ║  ✅  TORO TRANSMISSION CI/CD PIPELINE SUCCEEDED              ║
             ║                                                              ║
             ║  • Code Checked out & Validated                              ║
             ║  • Docker Image Built & Smoke-Tested                         ║
             ║  • Docker Hub Pushed: maxspeed2020/toro-transmission         ║
             ║  • Kubernetes Deployed: 2 Replicas Rolling Update            ║
             ║  • Service NodePort 30080 Active                             ║
-            ╚══════════════════════════════════════════════════════════════╝
+            ╚═══════════════════════════════════════════════════════════════╝
             '''
         }
         failure {
             echo '''
-            ╔══════════════════════════════════════════════════════════════╗
+            ╔═══════════════════════════════════════════════════════════════╗
             ║  ❌  PIPELINE FAILED                                         ║
             ║  Review stage logs above for root cause and diagnostics.     ║
-            ╚══════════════════════════════════════════════════════════════╝
+            ╚═══════════════════════════════════════════════════════════════╝
             '''
         }
         always {
