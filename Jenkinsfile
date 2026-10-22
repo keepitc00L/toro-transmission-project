@@ -98,11 +98,18 @@ pipeline {
                     echo "Starting test container on port ${TEST_PORT}..."
                     docker run -d --name toro-pipeline-test -p ${TEST_PORT}:80 ${IMAGE_REPO}:${IMAGE_TAG}
 
+                    # Determine reachability (host.docker.internal if inside docker container on Windows)
+                    TEST_HOST="localhost"
+                    if curl -s --connect-timeout 2 http://host.docker.internal:${TEST_PORT}/ >/dev/null 2>&1; then
+                        TEST_HOST="host.docker.internal"
+                    fi
+                    echo "Smoke testing target endpoint: http://\${TEST_HOST}:${TEST_PORT}/"
+
                     # Poll container readiness (up to 15 seconds)
                     echo "Waiting for Nginx container to become responsive..."
                     READY=0
                     for i in \$(seq 1 15); do
-                        HTTP_CODE=\$(curl -s -o /dev/null -w '%{http_code}' http://localhost:${TEST_PORT}/ || true)
+                        HTTP_CODE=\$(curl -s -o /dev/null -w '%{http_code}' http://\${TEST_HOST}:${TEST_PORT}/ || true)
                         if [ "\$HTTP_CODE" = "200" ]; then
                             READY=1
                             echo "Container responded with HTTP 200 OK after \$i second(s)."
@@ -119,7 +126,7 @@ pipeline {
 
                     # Verify that the expected site title is present
                     echo "Checking HTML content integrity..."
-                    if curl -s http://localhost:${TEST_PORT}/ | grep -q "Toro Transmission"; then
+                    if curl -s http://\${TEST_HOST}:${TEST_PORT}/ | grep -q "Toro Transmission"; then
                         echo "✅ Page content verified: 'Toro Transmission' found in payload."
                     else
                         echo "❌ ERROR: Web page body did not contain 'Toro Transmission'!"
